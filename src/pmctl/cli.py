@@ -330,6 +330,26 @@ def _find_requests(items: list, name: str, prefix: str = "") -> list[tuple[str, 
 
 # --- Environments subcommand ---
 
+
+def _resolve_and_get_environment(client: PostmanClient, id_or_name: str, workspace_id: Optional[str] = None) -> dict:
+    """Resolve an environment by ID or name, then fetch its details."""
+    # Try direct ID lookup first
+    try:
+        return client.get_environment(id_or_name)
+    except Exception:
+        pass
+
+    # Fall back to name matching via list
+    environments = client.list_environments(workspace_id=workspace_id)
+    matches = [e for e in environments if e["name"].lower() == id_or_name.lower()]
+    if len(matches) == 1:
+        return client.get_environment(matches[0]["id"])
+    if len(matches) > 1:
+        names = ", ".join(f'{m["name"]} ({m["id"]})' for m in matches)
+        raise typer.BadParameter(f"Multiple environments match '{id_or_name}': {names}. Use the ID instead.")
+    raise typer.BadParameter(f"Environment '{id_or_name}' not found. Run 'pmctl environments list' to see available environments.")
+
+
 env_app = typer.Typer(help="Manage Postman environments.", no_args_is_help=True)
 app.add_typer(env_app, name="environments")
 
@@ -360,33 +380,28 @@ def environments_list(
 
 @env_app.command("show")
 def environments_show(
-    env_id: str = typer.Argument(help="Environment ID"),
-    show_values: bool = typer.Option(False, "--values", "-v", help="Show variable values"),
+    env_id_or_name: str = typer.Argument(help="Environment ID or name"),
+    workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace ID (for name lookup)"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ):
     """Show environment variables."""
     config = load_config()
     p = config.get_profile(profile)
     with PostmanClient(p.api_key) as client:
-        env = client.get_environment(env_id)
+        env = _resolve_and_get_environment(client, env_id_or_name, workspace or p.workspace)
 
     console.print(f"[bold cyan]{env.get('name', 'Environment')}[/]\n")
 
     table = Table()
     table.add_column("Variable", style="cyan")
     table.add_column("Type", style="dim")
-    if show_values:
-        table.add_column("Value")
+    table.add_column("Value")
 
     for var in env.get("values", []):
-        row = [var["key"], var.get("type", "default")]
-        if show_values:
-            value = var.get("value", "")
-            # Mask sensitive-looking values
-            if any(k in var["key"].lower() for k in ("password", "secret", "token", "key")):
-                value = value[:4] + "****" if len(value) > 4 else "****"
-            row.append(value)
-        table.add_row(*row)
+        value = var.get("value", "")
+        if any(k in var["key"].lower() for k in ("password", "secret", "token", "key")):
+            value = value[:4] + "****" if len(value) > 4 else "****"
+        table.add_row(var["key"], var.get("type", "default"), value)
 
     console.print(table)
 

@@ -6,10 +6,11 @@ The official Postman CLI only supports running collections. `pmctl` fills the ga
 
 ## Features
 
-- 🔑 **Multi-profile support** — manage multiple Postman accounts (personal, work, etc.)
-- 📦 **Browse collections** — list and inspect collections with a beautiful tree view
-- 🌍 **Environments** — list environments and view variables
-- 🏢 **Workspaces** — list all accessible workspaces
+- 🔑 **Multi-profile support** — manage multiple Postman accounts with default workspaces
+- 📦 **Browse collections** — list collections, inspect with tree view, and drill into individual requests
+- 🌍 **Environments** — list environments and view variables by name or ID
+- 🏢 **Workspaces** — list and search workspaces
+- 🐚 **Shell completion** — tab completion for bash, zsh, and fish
 - 🎨 **Rich output** — colored tables and trees powered by [Rich](https://github.com/Textualize/rich)
 
 ## Installation
@@ -38,29 +39,43 @@ pmctl profile add personal --api-key "PMAK-..." --label "Personal Account" --def
 pmctl profile add work --api-key "PMAK-..." --label "Work Account"
 ```
 
-### 2. Browse your resources
+### 2. Set a default workspace
 
 ```bash
-# List collections
+# Set default workspace for your profile (so list commands scope to it automatically)
+pmctl profile set-workspace <workspace-id>
+```
+
+### 3. Browse your resources
+
+```bash
+# List collections (scoped to default workspace)
 pmctl collections list
 
-# List collections in a specific workspace
-pmctl collections list --workspace <workspace-id>
+# List collections from all workspaces
+pmctl collections list --all
 
 # Show all requests in a collection (tree view)
 pmctl collections show <collection-uid>
 
+# Inspect a specific request by name
+pmctl collections request <collection-uid> "request name"
+
 # List environments
 pmctl environments list
 
-# Show environment variables
-pmctl environments show <env-id> --values
+# Show environment variables (by name or ID)
+pmctl environments show "My Environment"
+pmctl environments show <env-id>
 
 # List workspaces
 pmctl workspaces list
+
+# Search workspaces by name
+pmctl workspaces list --search "keyword"
 ```
 
-### 3. Switch between profiles
+### 4. Switch between profiles
 
 ```bash
 # Switch default profile
@@ -76,11 +91,12 @@ pmctl profile whoami
 ## Profile Management
 
 ```bash
-pmctl profile list          # List all profiles
-pmctl profile add <name>    # Add a new profile
-pmctl profile remove <name> # Remove a profile
-pmctl profile switch <name> # Set default profile
-pmctl profile whoami        # Show current user info
+pmctl profile list                        # List all profiles
+pmctl profile add <name>                  # Add a new profile
+pmctl profile remove <name>               # Remove a profile
+pmctl profile switch <name>               # Set default profile
+pmctl profile set-workspace <workspace>   # Set default workspace for profile
+pmctl profile whoami                      # Show current user info
 ```
 
 ## Configuration
@@ -95,6 +111,7 @@ label = "personal@example.com"
 [profiles.work]
 api_key = "PMAK-..."
 label = "work@company.com"
+workspace = "your-workspace-id"
 
 default_profile = "work"
 ```
@@ -106,6 +123,19 @@ default_profile = "work"
 3. Copy the key and add it with `pmctl profile add`
 
 > **Note:** If you have multiple Postman accounts (e.g., personal + company SSO), each account has its own API keys page. Log into the correct account first.
+
+## Shell Completion
+
+```bash
+# Bash
+eval "$(pmctl completion bash)"
+
+# Zsh
+eval "$(pmctl completion zsh)"
+
+# Fish
+pmctl completion fish > ~/.config/fish/completions/pmctl.fish
+```
 
 ## License
 
