@@ -211,6 +211,123 @@ def _build_tree(tree: Tree, items: list) -> None:
             tree.add(f"[bold {color}]{method:7s}[/] {item['name']}  [dim]{raw_url}[/]")
 
 
+@collection_app.command("request")
+def collections_request(
+    uid: str = typer.Argument(help="Collection UID"),
+    name: str = typer.Argument(help="Request name (case-insensitive substring match)"),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+):
+    """Show details of a specific request in a collection."""
+    config = load_config()
+    p = config.get_profile(profile)
+    with PostmanClient(p.api_key) as client:
+        collection = client.get_collection(uid)
+
+    matches = _find_requests(collection.get("item", []), name)
+    if not matches:
+        console.print(f"[red]No request matching '{name}' found.[/]")
+        raise typer.Exit(1)
+    if len(matches) > 1:
+        console.print(f"[yellow]Multiple matches found ({len(matches)}). Showing first match.[/]")
+        for i, (path, _) in enumerate(matches):
+            console.print(f"  [dim]{i + 1}. {path}[/]")
+        console.print()
+
+    path, item = matches[0]
+    req = item.get("request", {})
+    method = req.get("method", "?")
+    url = req.get("url", {})
+    raw_url = url.get("raw", url) if isinstance(url, dict) else url
+
+    method_colors = {
+        "GET": "green", "POST": "yellow", "PUT": "blue",
+        "PATCH": "magenta", "DELETE": "red",
+    }
+    color = method_colors.get(method, "white")
+
+    console.print(f"[bold]{path}[/]\n")
+    console.print(f"[bold {color}]{method}[/] {raw_url}\n")
+
+    # Auth
+    auth = req.get("auth")
+    if auth:
+        auth_type = auth.get("type", "unknown")
+        console.print(f"[cyan]Auth:[/] {auth_type}")
+
+    # Headers
+    headers = req.get("header", [])
+    if headers:
+        table = Table(title="Headers", show_edge=False)
+        table.add_column("Key", style="cyan")
+        table.add_column("Value")
+        table.add_column("Enabled", style="dim")
+        for h in headers:
+            enabled = "✗" if h.get("disabled") else "✓"
+            table.add_row(h.get("key", ""), h.get("value", ""), enabled)
+        console.print(table)
+
+    # Query params
+    if isinstance(url, dict):
+        query = url.get("query", [])
+        if query:
+            table = Table(title="Query Params", show_edge=False)
+            table.add_column("Key", style="cyan")
+            table.add_column("Value")
+            table.add_column("Enabled", style="dim")
+            for q in query:
+                enabled = "✗" if q.get("disabled") else "✓"
+                table.add_row(q.get("key", ""), q.get("value", ""), enabled)
+            console.print(table)
+
+        # Path variables
+        variables = url.get("variable", [])
+        if variables:
+            table = Table(title="Path Variables", show_edge=False)
+            table.add_column("Key", style="cyan")
+            table.add_column("Value")
+            for v in variables:
+                table.add_row(v.get("key", ""), v.get("value", ""))
+            console.print(table)
+
+    # Body
+    body = req.get("body")
+    if body:
+        mode = body.get("mode", "")
+        console.print(f"\n[cyan]Body[/] [dim]({mode})[/]")
+        if mode == "raw":
+            raw = body.get("raw", "")
+            if raw:
+                console.print(raw)
+        elif mode == "formdata":
+            table = Table(show_edge=False)
+            table.add_column("Key", style="cyan")
+            table.add_column("Value")
+            table.add_column("Type", style="dim")
+            for fd in body.get("formdata", []):
+                table.add_row(fd.get("key", ""), fd.get("value", ""), fd.get("type", "text"))
+            console.print(table)
+        elif mode == "urlencoded":
+            table = Table(show_edge=False)
+            table.add_column("Key", style="cyan")
+            table.add_column("Value")
+            for ue in body.get("urlencoded", []):
+                table.add_row(ue.get("key", ""), ue.get("value", ""))
+            console.print(table)
+
+
+def _find_requests(items: list, name: str, prefix: str = "") -> list[tuple[str, dict]]:
+    """Recursively find requests matching a name (case-insensitive substring)."""
+    matches = []
+    keyword = name.lower()
+    for item in items:
+        path = f"{prefix}/{item['name']}" if prefix else item["name"]
+        if "item" in item:
+            matches.extend(_find_requests(item["item"], name, path))
+        elif keyword in item["name"].lower():
+            matches.append((path, item))
+    return matches
+
+
 # --- Environments subcommand ---
 
 env_app = typer.Typer(help="Manage Postman environments.", no_args_is_help=True)
