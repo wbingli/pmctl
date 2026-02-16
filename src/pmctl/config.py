@@ -21,6 +21,7 @@ class Profile:
     name: str
     api_key: str
     label: str = ""
+    workspace: str = ""
 
 
 @dataclass
@@ -63,6 +64,7 @@ def load_config() -> Config:
             name=name,
             api_key=profile_data["api_key"],
             label=profile_data.get("label", ""),
+            workspace=profile_data.get("workspace", ""),
         )
 
     if not profiles:
@@ -86,19 +88,21 @@ def save_config(config: Config) -> None:
         lines.append(f'api_key = "{profile.api_key}"')
         if profile.label:
             lines.append(f'label = "{profile.label}"')
+        if profile.workspace:
+            lines.append(f'workspace = "{profile.workspace}"')
         lines.append("")
 
     CONFIG_FILE.write_text("\n".join(lines))
 
 
-def add_profile(name: str, api_key: str, label: str = "", set_default: bool = False) -> Config:
+def add_profile(name: str, api_key: str, label: str = "", workspace: str = "", set_default: bool = False) -> Config:
     """Add a new profile to the config."""
     try:
         config = load_config()
     except FileNotFoundError:
         config = Config(profiles={}, default_profile=name)
 
-    config.profiles[name] = Profile(name=name, api_key=api_key, label=label)
+    config.profiles[name] = Profile(name=name, api_key=api_key, label=label, workspace=workspace)
 
     if set_default or len(config.profiles) == 1:
         config.default_profile = name
@@ -132,5 +136,19 @@ def set_default_profile(name: str) -> Config:
         raise ValueError(f"Profile '{name}' not found. Available: {available}")
 
     config.default_profile = name
+    save_config(config)
+    return config
+
+
+def set_profile_workspace(profile_name: str, workspace_id: str) -> Config:
+    """Set the default workspace for a profile."""
+    config = load_config()
+
+    name = profile_name or config.default_profile
+    if name not in config.profiles:
+        available = ", ".join(config.profiles.keys())
+        raise ValueError(f"Profile '{name}' not found. Available: {available}")
+
+    config.profiles[name].workspace = workspace_id
     save_config(config)
     return config

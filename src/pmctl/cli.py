@@ -15,6 +15,7 @@ from pmctl.config import (
     load_config,
     remove_profile,
     set_default_profile,
+    set_profile_workspace,
 )
 
 app = typer.Typer(
@@ -38,12 +39,14 @@ def profile_list():
     table.add_column("Name", style="cyan")
     table.add_column("Label", style="dim")
     table.add_column("Default", style="green")
+    table.add_column("Workspace", style="dim")
     table.add_column("API Key", style="dim")
 
     for prof_name, profile in config.profiles.items():
         is_default = "✓" if prof_name == config.default_profile else ""
         masked_key = profile.api_key[:12] + "..." + profile.api_key[-4:]
-        table.add_row(prof_name, profile.label, is_default, masked_key)
+        ws = profile.workspace[:12] + "..." if len(profile.workspace) > 12 else profile.workspace
+        table.add_row(prof_name, profile.label, is_default, ws, masked_key)
 
     console.print(table)
 
@@ -76,6 +79,17 @@ def profile_switch(name: str = typer.Argument(help="Profile name to set as defau
     console.print(f"[green]✓[/] Default profile switched to '{name}'.")
 
 
+@profile_app.command("set-workspace")
+def profile_set_workspace(
+    workspace_id: str = typer.Argument(help="Default workspace ID for this profile"),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to update (default: current default)"),
+):
+    """Set the default workspace for a profile."""
+    config = set_profile_workspace(profile or "", workspace_id)
+    name = profile or config.default_profile
+    console.print(f"[green]✓[/] Default workspace for '{name}' set to '{workspace_id}'.")
+
+
 @profile_app.command("whoami")
 def profile_whoami(
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
@@ -99,6 +113,7 @@ app.add_typer(workspace_app, name="workspaces")
 
 @workspace_app.command("list")
 def workspaces_list(
+    search: Optional[str] = typer.Option(None, "--search", "-s", help="Filter workspaces by name (case-insensitive)"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ):
     """List all accessible workspaces."""
@@ -106,6 +121,10 @@ def workspaces_list(
     p = config.get_profile(profile)
     with PostmanClient(p.api_key) as client:
         workspaces = client.list_workspaces()
+
+    if search:
+        keyword = search.lower()
+        workspaces = [ws for ws in workspaces if keyword in ws["name"].lower()]
 
     table = Table(title=f"Workspaces ({p.label or p.name})")
     table.add_column("Name", style="cyan")
@@ -128,13 +147,15 @@ app.add_typer(collection_app, name="collections")
 @collection_app.command("list")
 def collections_list(
     workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Filter by workspace ID"),
+    all_workspaces: bool = typer.Option(False, "--all", "-a", help="Show collections from all workspaces"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ):
     """List collections."""
     config = load_config()
     p = config.get_profile(profile)
+    effective_workspace = workspace or (None if all_workspaces else p.workspace or None)
     with PostmanClient(p.api_key) as client:
-        collections = client.list_collections(workspace_id=workspace)
+        collections = client.list_collections(workspace_id=effective_workspace)
 
     table = Table(title=f"Collections ({p.label or p.name})")
     table.add_column("Name", style="cyan")
@@ -199,13 +220,15 @@ app.add_typer(env_app, name="environments")
 @env_app.command("list")
 def environments_list(
     workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Filter by workspace ID"),
+    all_workspaces: bool = typer.Option(False, "--all", "-a", help="Show environments from all workspaces"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
 ):
     """List environments."""
     config = load_config()
     p = config.get_profile(profile)
+    effective_workspace = workspace or (None if all_workspaces else p.workspace or None)
     with PostmanClient(p.api_key) as client:
-        environments = client.list_environments(workspace_id=workspace)
+        environments = client.list_environments(workspace_id=effective_workspace)
 
     table = Table(title=f"Environments ({p.label or p.name})")
     table.add_column("Name", style="cyan")
@@ -249,6 +272,52 @@ def environments_show(
         table.add_row(*row)
 
     console.print(table)
+
+
+# --- Completion subcommand ---
+
+completion_app = typer.Typer(help="Generate shell completion scripts.", no_args_is_help=True)
+app.add_typer(completion_app, name="completion")
+
+
+def _print_completion_script(shell: str) -> None:
+    """Generate and print a shell completion script."""
+    from click.shell_completion import get_completion_class
+
+    click_app = typer.main.get_command(app)
+    comp_cls = get_completion_class(shell)
+    if comp_cls is None:
+        console.print(f"[red]Error:[/] Unsupported shell '{shell}'.")
+        raise typer.Exit(1)
+    comp = comp_cls(click_app, {}, "pmctl", "_PMCTL_COMPLETE")
+    typer.echo(comp.source())
+
+
+@completion_app.command("bash")
+def completion_bash():
+    """Generate bash completion script.
+
+    Usage:  eval "$(pmctl completion bash)"
+    """
+    _print_completion_script("bash")
+
+
+@completion_app.command("zsh")
+def completion_zsh():
+    """Generate zsh completion script.
+
+    Usage:  eval "$(pmctl completion zsh)"
+    """
+    _print_completion_script("zsh")
+
+
+@completion_app.command("fish")
+def completion_fish():
+    """Generate fish completion script.
+
+    Usage:  pmctl completion fish > ~/.config/fish/completions/pmctl.fish
+    """
+    _print_completion_script("fish")
 
 
 if __name__ == "__main__":
