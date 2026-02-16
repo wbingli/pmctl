@@ -21,7 +21,7 @@ pip install pmctl
 Or install from source:
 
 ```bash
-git clone https://github.com/wbinglee/pmctl.git
+git clone https://github.com/wbingli/pmctl.git
 cd pmctl
 pip install -e .
 ```
