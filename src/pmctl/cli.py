@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json as json_mod
+import sys
 from typing import Optional
 
 import typer
@@ -20,10 +22,32 @@ from pmctl.config import (
 
 app = typer.Typer(
     name="pmctl",
-    help="A CLI tool for managing Postman collections, environments, and workspaces.",
     no_args_is_help=True,
 )
 console = Console()
+
+_json_output: bool = False
+
+
+@app.callback()
+def main_callback(
+    json_output: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text"),
+):
+    """A CLI tool for managing Postman collections, environments, and workspaces."""
+    global _json_output
+    _json_output = json_output
+
+
+def _set_json_output(value: bool) -> bool:
+    global _json_output
+    if value:
+        _json_output = True
+    return value
+
+
+def _print_json(data: dict | list) -> None:
+    sys.stdout.write(json_mod.dumps(data, indent=2, default=str) + "\n")
+    sys.stdout.flush()
 
 # --- Profile subcommand ---
 
@@ -32,9 +56,27 @@ app.add_typer(profile_app, name="profile")
 
 
 @profile_app.command("list")
-def profile_list():
+def profile_list(
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
+):
     """List all configured profiles."""
     config = load_config()
+
+    if _json_output:
+        data = {
+            "default_profile": config.default_profile,
+            "profiles": {
+                name: {
+                    "label": prof.label,
+                    "api_key": prof.api_key,
+                    "workspace": prof.workspace,
+                }
+                for name, prof in config.profiles.items()
+            },
+        }
+        _print_json(data)
+        raise typer.Exit()
+
     table = Table(title="Profiles")
     table.add_column("Name", style="cyan")
     table.add_column("Label", style="dim")
@@ -93,12 +135,19 @@ def profile_set_workspace(
 @profile_app.command("whoami")
 def profile_whoami(
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """Show current user info for the active profile."""
     config = load_config()
     p = config.get_profile(profile)
     with PostmanClient(p.api_key) as client:
-        user = client.get_me().get("user", {})
+        me = client.get_me()
+
+    if _json_output:
+        _print_json(me)
+        raise typer.Exit()
+
+    user = me.get("user", {})
     console.print(f"[cyan]Email:[/]  {user.get('email', 'N/A')}")
     console.print(f"[cyan]Name:[/]   {user.get('fullName', 'N/A')}")
     console.print(f"[cyan]Team:[/]   {user.get('teamName', 'N/A')}")
@@ -115,6 +164,7 @@ app.add_typer(workspace_app, name="workspaces")
 def workspaces_list(
     search: Optional[str] = typer.Option(None, "--search", "-s", help="Filter workspaces by name (case-insensitive)"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """List all accessible workspaces."""
     config = load_config()
@@ -125,6 +175,10 @@ def workspaces_list(
     if search:
         keyword = search.lower()
         workspaces = [ws for ws in workspaces if keyword in ws["name"].lower()]
+
+    if _json_output:
+        _print_json(workspaces)
+        raise typer.Exit()
 
     table = Table(title=f"Workspaces ({p.label or p.name})")
     table.add_column("Name", style="cyan")
@@ -149,6 +203,7 @@ def collections_list(
     workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Filter by workspace ID"),
     all_workspaces: bool = typer.Option(False, "--all", "-a", help="Show collections from all workspaces"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """List collections."""
     config = load_config()
@@ -156,6 +211,10 @@ def collections_list(
     effective_workspace = workspace or (None if all_workspaces else p.workspace or None)
     with PostmanClient(p.api_key) as client:
         collections = client.list_collections(workspace_id=effective_workspace)
+
+    if _json_output:
+        _print_json(collections)
+        raise typer.Exit()
 
     table = Table(title=f"Collections ({p.label or p.name})")
     table.add_column("Name", style="cyan")
@@ -174,12 +233,17 @@ def collections_list(
 def collections_show(
     uid: str = typer.Argument(help="Collection UID"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """Show all requests in a collection as a tree."""
     config = load_config()
     p = config.get_profile(profile)
     with PostmanClient(p.api_key) as client:
         collection = client.get_collection(uid)
+
+    if _json_output:
+        _print_json(collection)
+        raise typer.Exit()
 
     tree = Tree(f"[bold cyan]{collection.get('info', {}).get('name', 'Collection')}[/]")
     _build_tree(tree, collection.get("item", []))
@@ -216,6 +280,7 @@ def collections_request(
     uid: str = typer.Argument(help="Collection UID"),
     name: str = typer.Argument(help="Request name (case-insensitive substring match)"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """Show details of a specific request in a collection."""
     config = load_config()
@@ -225,8 +290,17 @@ def collections_request(
 
     matches = _find_requests(collection.get("item", []), name)
     if not matches:
+        if _json_output:
+            _print_json([])
+            raise typer.Exit(1)
         console.print(f"[red]No request matching '{name}' found.[/]")
         raise typer.Exit(1)
+
+    if _json_output:
+        data = [{"path": path, **item} for path, item in matches]
+        _print_json(data)
+        raise typer.Exit()
+
     if len(matches) > 1:
         console.print(f"[yellow]Multiple matches found ({len(matches)}). Showing first match.[/]")
         for i, (path, _) in enumerate(matches):
@@ -359,6 +433,7 @@ def environments_list(
     workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Filter by workspace ID"),
     all_workspaces: bool = typer.Option(False, "--all", "-a", help="Show environments from all workspaces"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """List environments."""
     config = load_config()
@@ -366,6 +441,10 @@ def environments_list(
     effective_workspace = workspace or (None if all_workspaces else p.workspace or None)
     with PostmanClient(p.api_key) as client:
         environments = client.list_environments(workspace_id=effective_workspace)
+
+    if _json_output:
+        _print_json(environments)
+        raise typer.Exit()
 
     table = Table(title=f"Environments ({p.label or p.name})")
     table.add_column("Name", style="cyan")
@@ -383,6 +462,8 @@ def environments_show(
     env_id_or_name: str = typer.Argument(help="Environment ID or name"),
     workspace: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace ID (for name lookup)"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    full: bool = typer.Option(False, "--full", "-f", help="Show full values on separate lines (no truncation)"),
+    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
 ):
     """Show environment variables."""
     config = load_config()
@@ -390,20 +471,35 @@ def environments_show(
     with PostmanClient(p.api_key) as client:
         env = _resolve_and_get_environment(client, env_id_or_name, workspace or p.workspace)
 
+    if _json_output:
+        _print_json(env)
+        raise typer.Exit()
+
     console.print(f"[bold cyan]{env.get('name', 'Environment')}[/]\n")
 
-    table = Table()
-    table.add_column("Variable", style="cyan")
-    table.add_column("Type", style="dim")
-    table.add_column("Value")
-
-    for var in env.get("values", []):
+    values = env.get("values", [])
+    for var in values:
         value = var.get("value", "")
         if any(k in var["key"].lower() for k in ("password", "secret", "token", "key")):
             value = value[:4] + "****" if len(value) > 4 else "****"
-        table.add_row(var["key"], var.get("type", "default"), value)
+        var["_display_value"] = value
 
-    console.print(table)
+    if full:
+        for var in values:
+            var_type = var.get("type", "default")
+            console.print(f"[cyan]{var['key']}[/] [dim]({var_type})[/]")
+            console.print(f"  {var['_display_value']}", soft_wrap=True)
+            console.print()
+    else:
+        table = Table()
+        table.add_column("Variable", style="cyan")
+        table.add_column("Type", style="dim")
+        table.add_column("Value")
+
+        for var in values:
+            table.add_row(var["key"], var.get("type", "default"), var["_display_value"])
+
+        console.print(table)
 
 
 # --- Completion subcommand ---
