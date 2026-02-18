@@ -59,14 +59,19 @@ pmctl collections list --all
 # Show all requests in a collection (tree view)
 pmctl collections show <collection-uid>
 
-# List all requests in a collection (flat table)
+# List all requests in a collection (flat table, by name or UID)
 pmctl requests list --collection "My Collection"
+pmctl requests list -c <collection-uid>
 
-# Search requests with fuzzy matching
-pmctl requests list --collection "My Collection" --search "getCampaign"
+# Fuzzy search requests (characters matched in order, e.g. "crtUsr" matches "Create User")
+pmctl requests list -c "My Collection" --search "getUser"
 
 # Inspect a specific request by name
-pmctl requests show "request name" --collection "My Collection"
+pmctl requests show "Create User" --collection "My Collection"
+
+# JSON output for scripting
+pmctl requests list -c "My Collection" --json
+pmctl requests show "Create User" -c "My Collection" --json
 
 # List environments
 pmctl environments list
@@ -104,26 +109,6 @@ pmctl profile remove <name>               # Remove a profile
 pmctl profile switch <name>               # Set default profile
 pmctl profile set-workspace <workspace>   # Set default workspace for profile
 pmctl profile whoami                      # Show current user info
-```
-
-## Requests
-
-The `requests` subcommand lets you browse and inspect individual API requests within collections. The `--collection` flag accepts either a UID or a collection name.
-
-```bash
-# List all requests in a collection (by name or UID)
-pmctl requests list --collection "Campaign Manager Service"
-pmctl requests list -c 39419311-64642488-12d1-4bf1-8aff-689c5c77039f
-
-# Fuzzy search requests (characters matched in order, e.g. "crtcmp" matches "Create Campaign")
-pmctl requests list -c "Campaign Manager Service" --search "getCampaign"
-
-# Show full details of a specific request (method, URL, headers, body, params)
-pmctl requests show "get Campaign By Id" -c "Campaign Manager Service"
-
-# JSON output for scripting
-pmctl requests list -c "Campaign Manager Service" --json
-pmctl requests show "get Campaign By Id" -c "Campaign Manager Service" --json
 ```
 
 ## Configuration
