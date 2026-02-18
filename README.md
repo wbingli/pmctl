@@ -7,7 +7,8 @@ The official Postman CLI only supports running collections. `pmctl` fills the ga
 ## Features
 
 - 🔑 **Multi-profile support** — manage multiple Postman accounts with default workspaces
-- 📦 **Browse collections** — list collections, inspect with tree view, and drill into individual requests
+- 📦 **Browse collections** — list collections and inspect with tree view
+- 🔍 **Request browser** — list, search (fuzzy match), and inspect individual requests across collections
 - 🌍 **Environments** — list environments and view variables by name or ID
 - 🏢 **Workspaces** — list and search workspaces
 - 🐚 **Shell completion** — tab completion for bash, zsh, and fish
@@ -58,8 +59,14 @@ pmctl collections list --all
 # Show all requests in a collection (tree view)
 pmctl collections show <collection-uid>
 
+# List all requests in a collection (flat table)
+pmctl requests list --collection "My Collection"
+
+# Search requests with fuzzy matching
+pmctl requests list --collection "My Collection" --search "getCampaign"
+
 # Inspect a specific request by name
-pmctl collections request <collection-uid> "request name"
+pmctl requests show "request name" --collection "My Collection"
 
 # List environments
 pmctl environments list
@@ -97,6 +104,26 @@ pmctl profile remove <name>               # Remove a profile
 pmctl profile switch <name>               # Set default profile
 pmctl profile set-workspace <workspace>   # Set default workspace for profile
 pmctl profile whoami                      # Show current user info
+```
+
+## Requests
+
+The `requests` subcommand lets you browse and inspect individual API requests within collections. The `--collection` flag accepts either a UID or a collection name.
+
+```bash
+# List all requests in a collection (by name or UID)
+pmctl requests list --collection "Campaign Manager Service"
+pmctl requests list -c 39419311-64642488-12d1-4bf1-8aff-689c5c77039f
+
+# Fuzzy search requests (characters matched in order, e.g. "crtcmp" matches "Create Campaign")
+pmctl requests list -c "Campaign Manager Service" --search "getCampaign"
+
+# Show full details of a specific request (method, URL, headers, body, params)
+pmctl requests show "get Campaign By Id" -c "Campaign Manager Service"
+
+# JSON output for scripting
+pmctl requests list -c "Campaign Manager Service" --json
+pmctl requests show "get Campaign By Id" -c "Campaign Manager Service" --json
 ```
 
 ## Configuration

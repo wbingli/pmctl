@@ -275,20 +275,147 @@ def _build_tree(tree: Tree, items: list) -> None:
             tree.add(f"[bold {color}]{method:7s}[/] {item['name']}  [dim]{raw_url}[/]")
 
 
-@collection_app.command("request")
-def collections_request(
-    uid: str = typer.Argument(help="Collection UID"),
-    name: str = typer.Argument(help="Request name (case-insensitive substring match)"),
+def _find_requests(items: list, name: str, prefix: str = "") -> list[tuple[str, dict]]:
+    """Recursively find requests matching a name (case-insensitive substring)."""
+    matches = []
+    keyword = name.lower()
+    for item in items:
+        path = f"{prefix}/{item['name']}" if prefix else item["name"]
+        if "item" in item:
+            matches.extend(_find_requests(item["item"], name, path))
+        elif keyword in item["name"].lower():
+            matches.append((path, item))
+    return matches
+
+
+def _flatten_requests(items: list, prefix: str = "") -> list[tuple[str, dict]]:
+    """Recursively flatten all requests from collection items with their folder path."""
+    results = []
+    for item in items:
+        path = f"{prefix}/{item['name']}" if prefix else item["name"]
+        if "item" in item:
+            results.extend(_flatten_requests(item["item"], path))
+        else:
+            results.append((path, item))
+    return results
+
+
+def _fuzzy_match(text: str, query: str) -> bool:
+    """Check if all characters of query appear in text in order (case-insensitive)."""
+    text_lower = text.lower()
+    query_lower = query.lower()
+    t_idx = 0
+    for ch in query_lower:
+        pos = text_lower.find(ch, t_idx)
+        if pos == -1:
+            return False
+        t_idx = pos + 1
+    return True
+
+
+def _resolve_collection(client: PostmanClient, id_or_name: str, workspace_id: str | None = None) -> dict:
+    """Resolve a collection by UID or name, then fetch its full details."""
+    # Try direct UID lookup first
+    try:
+        return client.get_collection(id_or_name)
+    except Exception:
+        pass
+
+    # Fall back to name matching via list
+    collections = client.list_collections(workspace_id=workspace_id)
+    matches = [c for c in collections if c["name"].lower() == id_or_name.lower()]
+    if not matches:
+        # Try substring match
+        matches = [c for c in collections if id_or_name.lower() in c["name"].lower()]
+    if len(matches) == 1:
+        return client.get_collection(matches[0]["uid"])
+    if len(matches) > 1:
+        names = ", ".join(f'{m["name"]} ({m["uid"]})' for m in matches)
+        raise typer.BadParameter(f"Multiple collections match '{id_or_name}': {names}. Use the UID instead.")
+    raise typer.BadParameter(
+        f"Collection '{id_or_name}' not found. Run 'pmctl collections list' to see available collections."
+    )
+
+
+# --- Requests subcommand ---
+
+request_app = typer.Typer(help="Browse and inspect requests in Postman collections.", no_args_is_help=True)
+app.add_typer(request_app, name="requests")
+
+
+@request_app.command("list")
+def requests_list(
+    collection: str = typer.Option(..., "--collection", "-c", help="Collection UID or name"),
+    search: Optional[str] = typer.Option(None, "--search", "-s", help="Filter requests by name (fuzzy match)"),
     profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
-    json: bool = typer.Option(False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True),
+    json: bool = typer.Option(
+        False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True
+    ),
 ):
-    """Show details of a specific request in a collection."""
+    """List requests in a collection."""
     config = load_config()
     p = config.get_profile(profile)
     with PostmanClient(p.api_key) as client:
-        collection = client.get_collection(uid)
+        col = _resolve_collection(client, collection, workspace_id=p.workspace or None)
 
-    matches = _find_requests(collection.get("item", []), name)
+    all_requests = _flatten_requests(col.get("item", []))
+
+    if search:
+        all_requests = [
+            (path, item)
+            for path, item in all_requests
+            if _fuzzy_match(item["name"], search) or _fuzzy_match(path, search)
+        ]
+
+    if _json_output:
+        data = []
+        for path, item in all_requests:
+            req = item.get("request", {})
+            url = req.get("url", {})
+            raw_url = url.get("raw", url) if isinstance(url, dict) else url
+            data.append({"name": item["name"], "path": path, "method": req.get("method", ""), "url": raw_url})
+        _print_json(data)
+        raise typer.Exit()
+
+    col_name = col.get("info", {}).get("name", "Collection")
+    title = f"Requests in {col_name}"
+    if search:
+        title += f'  (search: "{search}")'
+    table = Table(title=title)
+    table.add_column("Method", style="bold")
+    table.add_column("Name", style="cyan")
+    table.add_column("Path", style="dim")
+    table.add_column("URL", style="dim", max_width=60)
+
+    method_colors = {"GET": "green", "POST": "yellow", "PUT": "blue", "PATCH": "magenta", "DELETE": "red"}
+    for path, item in all_requests:
+        req = item.get("request", {})
+        method = req.get("method", "?")
+        url = req.get("url", {})
+        raw_url = url.get("raw", url) if isinstance(url, dict) else url
+        color = method_colors.get(method, "white")
+        table.add_row(f"[{color}]{method}[/]", item["name"], path, str(raw_url))
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(all_requests)} requests[/]")
+
+
+@request_app.command("show")
+def requests_show(
+    name: str = typer.Argument(help="Request name (case-insensitive substring match)"),
+    collection: str = typer.Option(..., "--collection", "-c", help="Collection UID or name"),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Profile to use"),
+    json: bool = typer.Option(
+        False, "--json", help="Output raw JSON instead of formatted text", callback=_set_json_output, is_eager=True
+    ),
+):
+    """Show details of a specific request."""
+    config = load_config()
+    p = config.get_profile(profile)
+    with PostmanClient(p.api_key) as client:
+        col = _resolve_collection(client, collection, workspace_id=p.workspace or None)
+
+    matches = _find_requests(col.get("item", []), name)
     if not matches:
         if _json_output:
             _print_json([])
@@ -313,10 +440,7 @@ def collections_request(
     url = req.get("url", {})
     raw_url = url.get("raw", url) if isinstance(url, dict) else url
 
-    method_colors = {
-        "GET": "green", "POST": "yellow", "PUT": "blue",
-        "PATCH": "magenta", "DELETE": "red",
-    }
+    method_colors = {"GET": "green", "POST": "yellow", "PUT": "blue", "PATCH": "magenta", "DELETE": "red"}
     color = method_colors.get(method, "white")
 
     console.print(f"[bold]{path}[/]\n")
@@ -387,19 +511,6 @@ def collections_request(
             for ue in body.get("urlencoded", []):
                 table.add_row(ue.get("key", ""), ue.get("value", ""))
             console.print(table)
-
-
-def _find_requests(items: list, name: str, prefix: str = "") -> list[tuple[str, dict]]:
-    """Recursively find requests matching a name (case-insensitive substring)."""
-    matches = []
-    keyword = name.lower()
-    for item in items:
-        path = f"{prefix}/{item['name']}" if prefix else item["name"]
-        if "item" in item:
-            matches.extend(_find_requests(item["item"], name, path))
-        elif keyword in item["name"].lower():
-            matches.append((path, item))
-    return matches
 
 
 # --- Environments subcommand ---
