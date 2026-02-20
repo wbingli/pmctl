@@ -1,0 +1,43 @@
+---
+description: Use pmctl to browse Postman collections, inspect API requests, resolve environment variables, and construct curl commands. Trigger when working with Postman data, API discovery, or endpoint lookup.
+globs:
+alwaysApply: false
+---
+
+# pmctl — Postman CLI for API Discovery
+
+`pmctl` wraps the Postman API. Install: `pip install pmctl`
+
+## Setup
+
+```bash
+pmctl profile add <name> --api-key "PMAK-..." --default
+pmctl profile set-workspace <workspace-id>
+```
+
+## Key Commands
+
+```bash
+pmctl collections list                          # List collections
+pmctl collections show <UID>                    # Tree view
+pmctl requests list -c "Collection" --search "query"  # Fuzzy search requests
+pmctl requests show "name" -c "Collection"      # Request details (headers, body, params)
+pmctl environments show <name-or-id>           # Environment variables
+pmctl environments show <name> --json           # Unmasked JSON output
+```
+
+## Resolve {{variables}} to Real URLs
+
+```bash
+# Get request URL (contains {{base-url}}/v1/users/:id)
+pmctl requests show "get User" -c "My API" --json
+
+# Resolve variable for an environment
+pmctl environments show "Prod" --json | jq -r '.values[] | select(.key == "base-url") | .value'
+```
+
+## Tips
+- `-c` accepts collection name (case-insensitive) or UID
+- `--json` for machine-readable output, pipe to `jq`
+- `requests show` uses substring match; `requests list --search` uses fuzzy match
+- `--profile <name>` to switch between Postman accounts

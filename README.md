@@ -149,6 +149,52 @@ eval "$(pmctl completion zsh)"
 pmctl completion fish > ~/.config/fish/completions/pmctl.fish
 ```
 
+## AI Agent Integrations
+
+pmctl is designed to be used by both humans and AI agents. It ships with skill/plugin definitions for all major AI coding tools.
+
+### Claude Code Plugin
+
+This repo is a [Claude Code plugin](https://code.claude.com/docs/en/plugins). Point Claude Code at this directory:
+
+```bash
+claude --plugin-dir /path/to/pmctl
+```
+
+Skills are in `skills/pmctl/SKILL.md`. Claude Code will namespace them as `/pmctl:pmctl`.
+
+### OpenAI Codex Skill
+
+Skills are in `.agents/skills/pmctl/SKILL.md` following the [Agent Skills standard](https://agentskills.io). Codex picks them up automatically when you work inside this repo, or copy the skill folder to `~/.agents/skills/pmctl/` for global access.
+
+### Cursor Plugin
+
+This repo is a [Cursor plugin](https://cursor.com/docs/plugins/building.md). It includes both the plugin manifest (`.cursor-plugin/plugin.json`) and a skill (`skills/pmctl/SKILL.md`). Additionally, a rule file at `.cursor/rules/pmctl.mdc` is auto-loaded when you open this repo.
+
+### OpenClaw (ClawHub)
+
+Published on [ClawHub](https://clawhub.ai/skills/pmctl):
+
+```bash
+clawhub install pmctl
+```
+
+### Other AI Tools
+
+The `skill/SKILL.md` file is a standalone skill definition that works with any tool supporting the [Agent Skills spec](https://agentskills.io). Copy it into your tool's skill directory.
+
+## Publishing to ClawHub
+
+To publish a new version:
+
+```bash
+# Login (one-time)
+clawhub login
+
+# Publish
+clawhub publish ./skill --slug pmctl --name "pmctl" --version <version> --changelog "description" --tags latest
+```
+
 ## License
 
 MIT

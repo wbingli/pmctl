@@ -1,0 +1,12 @@
+{
+  "name": "pmctl",
+  "description": "Browse and inspect Postman collections, requests, and environments from the terminal. Discover API endpoints, resolve environment variables, and construct curl commands.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Wenbing Li"
+  },
+  "homepage": "https://github.com/wbingli/pmctl",
+  "repository": "https://github.com/wbingli/pmctl",
+  "license": "MIT",
+  "keywords": ["postman", "api", "collections", "environments", "curl"]
+}
