@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "pmctl",
-      "source": ".",
+      "source": "./plugins/pmctl",
       "description": "Browse and inspect Postman collections, requests, and environments from the terminal. Discover API endpoints, resolve environment variables, and construct curl commands."
     }
   ]
