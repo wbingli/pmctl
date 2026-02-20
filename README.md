@@ -155,13 +155,12 @@ pmctl is designed to be used by both humans and AI agents. It ships with skill/p
 
 ### Claude Code Plugin
 
-This repo is a [Claude Code plugin](https://code.claude.com/docs/en/plugins). Point Claude Code at this directory:
+This repo is a [Claude Code plugin](https://code.claude.com/docs/en/plugins). Install it directly inside Claude Code:
 
-```bash
-claude --plugin-dir /path/to/pmctl
 ```
-
-Skills are in `skills/pmctl/SKILL.md`. Claude Code will namespace them as `/pmctl:pmctl`.
+/plugin marketplace add wbingli/pmctl
+/plugin install pmctl
+```
 
 ### OpenAI Codex Skill
 
