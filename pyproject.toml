@@ -4,17 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pmctl"
-version = "0.1.4"
-description = "A CLI tool for managing Postman collections, environments, and workspaces"
+version = "0.2.0"
+description = "CLI for browsing Postman collections, requests, and environments. Ships as an AI agent skill/plugin for Claude Code, Cursor, Codex, and OpenClaw."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
     { name = "Wenbing Li" },
 ]
-keywords = ["postman", "cli", "api", "collections"]
+keywords = ["postman", "cli", "api", "collections", "ai-agent", "claude-code", "cursor", "codex", "skill", "plugin"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
