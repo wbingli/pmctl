@@ -159,7 +159,7 @@ This repo is a [Claude Code plugin](https://code.claude.com/docs/en/plugins). In
 
 ```bash
 claude plugin marketplace add wbingli/pmctl
-claude plugin install pmctl
+claude plugin install pmctl@pmctl
 ```
 
 ### OpenAI Codex Skill

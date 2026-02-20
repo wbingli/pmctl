@@ -1,0 +1,13 @@
+{
+  "name": "pmctl",
+  "owner": {
+    "name": "Wenbing Li"
+  },
+  "plugins": [
+    {
+      "name": "pmctl",
+      "source": ".",
+      "description": "Browse and inspect Postman collections, requests, and environments from the terminal. Discover API endpoints, resolve environment variables, and construct curl commands."
+    }
+  ]
+}
