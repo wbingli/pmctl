@@ -14,7 +14,7 @@ description: Browse and inspect Postman collections, requests, and environments 
 
 ```bash
 # Add a profile with your Postman API key
-pmctl profile add <name> --api-key "PMAK-..." --default
+pmctl profile add <name> --api-key "<your-api-key>" --default
 
 # Set a default workspace (scopes list commands)
 pmctl profile set-workspace <workspace-id>
@@ -31,7 +31,7 @@ Get an API key at https://go.postman.co/settings/me/api-keys
 
 ```bash
 pmctl profile list                          # List profiles
-pmctl profile add <name> -k "PMAK-..." -d  # Add (--default)
+pmctl profile add <name> -k "<your-api-key>" -d  # Add (--default)
 pmctl profile switch <name>                 # Switch default
 pmctl profile set-workspace <id>            # Set default workspace
 pmctl profile remove <name>                 # Remove
@@ -124,6 +124,6 @@ pmctl collections show <uid>
 ## Tips
 
 - `--json` output is pipeable to `jq` for scripting
-- `environments show --json` returns **unmasked** secrets — useful for scripting
+- `environments show --json` returns full variable values without truncation — useful for scripting
 - Collection names are matched case-insensitively; prefer names over UIDs for readability
 - Multiple profiles let you manage separate Postman accounts (personal, work, etc.)
