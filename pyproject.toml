@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pmctl"
-version = "0.2.0"
+version = "0.2.1"
 description = "CLI for browsing Postman collections, requests, and environments. Ships as an AI agent skill/plugin for Claude Code, Cursor, Codex, and OpenClaw."
 readme = "README.md"
 license = "MIT"

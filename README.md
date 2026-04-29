@@ -34,10 +34,10 @@ pip install -e .
 
 ```bash
 # Add your Postman API key (get one at https://go.postman.co/settings/me/api-keys)
-pmctl profile add personal --api-key "PMAK-..." --label "Personal Account" --default
+pmctl profile add personal --api-key "<your-api-key>" --label "Personal Account" --default
 
 # Add another profile (e.g., work account)
-pmctl profile add work --api-key "PMAK-..." --label "Work Account"
+pmctl profile add work --api-key "<your-api-key>" --label "Work Account"
 ```
 
 ### 2. Set a default workspace
@@ -117,11 +117,11 @@ Profiles are stored in `~/.config/pmctl/config.toml`:
 
 ```toml
 [profiles.personal]
-api_key = "PMAK-..."
+api_key = "<your-api-key>"
 label = "personal@example.com"
 
 [profiles.work]
-api_key = "PMAK-..."
+api_key = "<your-api-key>"
 label = "work@company.com"
 workspace = "your-workspace-id"
 

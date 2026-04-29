@@ -11,7 +11,7 @@ alwaysApply: false
 ## Setup
 
 ```bash
-pmctl profile add <name> --api-key "PMAK-..." --default
+pmctl profile add <name> --api-key "<your-api-key>" --default
 pmctl profile set-workspace <workspace-id>
 ```
 
@@ -23,7 +23,7 @@ pmctl collections show <UID>                    # Tree view
 pmctl requests list -c "Collection" --search "query"  # Fuzzy search requests
 pmctl requests show "name" -c "Collection"      # Request details (headers, body, params)
 pmctl environments show <name-or-id>           # Environment variables
-pmctl environments show <name> --json           # Unmasked JSON output
+pmctl environments show <name> --json           # Full JSON output (untruncated values)
 ```
 
 ## Resolve {{variables}} to Real URLs
